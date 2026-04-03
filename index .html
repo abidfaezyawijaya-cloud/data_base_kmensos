@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Bersama</title>
+
+  <!-- 🔥 FIREBASE -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <style>
+  /* 🔥 SEMUA CSS LU TETAP (GAK DIUBAH) */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #f5f5f3;
+    color: #1a1a18;
+    min-height: 100vh;
+  }
+  .app { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem; }
+  .topbar { display: flex; justify-content: space-between; margin-bottom: 1rem; }
+  .app-title { font-size: 20px; font-weight: 600; }
+  .record-count { font-size: 12px; }
+  .sync-label { font-size: 12px; color: green; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 1rem; }
+  .btn { padding: 8px; cursor: pointer; }
+  .btn.primary { background: black; color: white; }
+  .form-card { background: white; padding: 1rem; margin-bottom: 1rem; }
+  .table-wrap { background: white; padding: 1rem; }
+  table { width: 100%; }
+  </style>
+</head>
+
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div>
+      <span class="app-title">Database Bersama</span>
+      <span id="rcnt">0 data</span>
+    </div>
+    <div id="sync-status">Connecting...</div>
+  </div>
+
+  <div class="toolbar">
+    <input id="search" placeholder="Cari..." oninput="render()">
+    <button class="btn primary" onclick="openForm()">+ Tambah</button>
+  </div>
+
+  <div id="form-area"></div>
+  <div id="table-area"></div>
+
+</div>
+
+<script>
+// ================= FIREBASE =================
+const firebaseConfig = {
+  apiKey: "ISI_API_KEY",
+  authDomain: "ISI_PROJECT.firebaseapp.com",
+  databaseURL: "https://ISI_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "ISI_PROJECT",
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const dbRef = db.ref("database-bersama");
+
+// ================= STATE =================
+let records = [];
+let editingId = null;
+
+// ================= LOAD REALTIME =================
+function load() {
+  dbRef.on("value", (snapshot) => {
+    const data = snapshot.val() || {};
+    records = Object.values(data);
+
+    render();
+
+    document.getElementById("sync-status").innerText =
+      "Realtime aktif " + new Date().toLocaleTimeString();
+  });
+}
+
+// ================= SAVE =================
+function save() {
+  const obj = {};
+  records.forEach(r => obj[r.id] = r);
+  dbRef.set(obj);
+}
+
+// ================= RENDER =================
+function render() {
+  const table = document.getElementById("table-area");
+  const q = document.getElementById("search").value.toLowerCase();
+
+  const filtered = records.filter(r =>
+    (r.nama || "").toLowerCase().includes(q)
+  );
+
+  document.getElementById("rcnt").innerText = records.length + " data";
+
+  table.innerHTML = `
+    <div class="table-wrap">
+      ${filtered.map(r => `
+        <div>
+          <b>${r.nama}</b> (${r.status})
+          <button onclick="openForm('${r.id}')">Edit</button>
+          <button onclick="hapus('${r.id}')">Hapus</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+// ================= FORM =================
+function openForm(id) {
+  editingId = id || null;
+  const rec = records.find(r => r.id === id) || {};
+
+  document.getElementById("form-area").innerHTML = `
+    <div class="form-card">
+      <input id="f-nama" placeholder="Nama" value="${rec.nama || ''}">
+      <select id="f-status">
+        <option ${rec.status=="Aktif"?"selected":""}>Aktif</option>
+        <option ${rec.status=="Pending"?"selected":""}>Pending</option>
+        <option ${rec.status=="Selesai"?"selected":""}>Selesai</option>
+      </select>
+      <button onclick="saveForm()">Simpan</button>
+    </div>
+  `;
+}
+
+function saveForm() {
+  const data = {
+    id: editingId || Date.now().toString(),
+    nama: document.getElementById("f-nama").value,
+    status: document.getElementById("f-status").value
+  };
+
+  if (editingId) {
+    const i = records.findIndex(r => r.id === editingId);
+    records[i] = data;
+  } else {
+    records.push(data);
+  }
+
+  save();
+  document.getElementById("form-area").innerHTML = "";
+}
+
+// ================= DELETE =================
+function hapus(id) {
+  records = records.filter(r => r.id !== id);
+  save();
+}
+
+// ================= INIT =================
+load();
+</script>
+
+</body>
+</html>
